@@ -789,8 +789,8 @@ test("integration: qoder session reuse preserves persisted startup flags", async
 
     try {
       await writeFakeQoderAgent(fakeBinDir, argLogPath);
-      const { createSession } = await import("../src/session.js");
-      const { runSessionSetModeDirect } = await import("../src/session-runtime/prompt-runner.js");
+      const { createSession } = await import("../src/session/session.js");
+      const { runSessionSetModeDirect } = await import("../src/cli/session/prompt-runner.js");
       const previousHome = process.env.HOME;
       const previousPath = process.env.PATH;
       process.env.HOME = homeDir;
@@ -3093,7 +3093,10 @@ async function awaitChildClose(child: ReturnType<typeof spawn>): Promise<CliRunR
 async function runPerfReport(filePath: string): Promise<CliRunResult> {
   return await new Promise<CliRunResult>((resolve, reject) => {
     const child = spawn("pnpm", ["exec", "tsx", "scripts/perf-report.ts", filePath], {
-      env: process.env,
+      env: {
+        ...process.env,
+        NODE_V8_COVERAGE: "",
+      },
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
     });
