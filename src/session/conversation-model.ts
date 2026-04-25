@@ -454,6 +454,9 @@ export function cloneSessionAcpxState(
   return {
     current_mode_id: state.current_mode_id,
     desired_mode_id: state.desired_mode_id,
+    desired_config_options: state.desired_config_options
+      ? { ...state.desired_config_options }
+      : undefined,
     current_model_id: state.current_model_id,
     available_models: state.available_models ? [...state.available_models] : undefined,
     available_commands: state.available_commands ? [...state.available_commands] : undefined,

@@ -16,7 +16,7 @@ import {
   trimConversationForRuntime,
 } from "../../session/conversation-model.js";
 import { defaultSessionEventLog } from "../../session/event-log.js";
-import { setDesiredModeId } from "../../session/mode-preference.js";
+import { setDesiredConfigOption, setDesiredModeId } from "../../session/mode-preference.js";
 import type { ClientOperation, SessionRecord, SessionResumePolicy } from "../../types.js";
 import type {
   AcpRuntimeEvent,
@@ -572,6 +572,9 @@ export class AcpRuntimeManager {
               await sessionReady.promise;
             }
             await runtimeClient.setSessionMode(activeSessionId, modeId);
+            const nextState = cloneSessionAcpxState(acpxState) ?? {};
+            nextState.desired_mode_id = modeId;
+            acpxState = nextState;
           },
           setSessionModel: async (modelId: string) => {
             if (!runtimeClient.hasActivePrompt()) {
@@ -591,6 +594,18 @@ export class AcpRuntimeManager {
             if (response?.configOptions) {
               const nextState = cloneSessionAcpxState(acpxState) ?? {};
               nextState.config_options = structuredClone(response.configOptions);
+              acpxState = nextState;
+            }
+            if (configId === "mode") {
+              const nextState = cloneSessionAcpxState(acpxState) ?? {};
+              nextState.desired_mode_id = value;
+              acpxState = nextState;
+            } else if (configId !== "model") {
+              const nextState = cloneSessionAcpxState(acpxState) ?? {};
+              nextState.desired_config_options = {
+                ...nextState.desired_config_options,
+                [configId]: value,
+              };
               acpxState = nextState;
             }
             return response;
@@ -832,6 +847,8 @@ export class AcpRuntimeManager {
           applyConfigOptionsToRecord(connectedRecord, response?.configOptions);
           if (key === "mode") {
             setDesiredModeId(connectedRecord, value);
+          } else {
+            setDesiredConfigOption(connectedRecord, key, value);
           }
         },
       );
@@ -839,6 +856,8 @@ export class AcpRuntimeManager {
     }
     if (key === "mode") {
       setDesiredModeId(targetRecord, value);
+    } else {
+      setDesiredConfigOption(targetRecord, key, value);
     }
     await this.options.sessionStore.save(targetRecord);
   }

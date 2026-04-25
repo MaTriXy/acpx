@@ -18,6 +18,7 @@ Repo: https://github.com/openclaw/acpx
 
 ### Fixes
 
+- CLI/runtime: persist non-mode `session/set_config_option` values and replay them on fresh adapter sessions, so options such as Codex `reasoning_effort` survive session fallback/reuse. (#138)
 - CLI/sessions: persist the submitted prompt at turn start so `sessions history` and `sessions read` no longer report `No history` while an active prompt is already running. (#157)
 - Output/errors: add text-mode remediation hints for timeouts, provider rate limits, and invalid model names.
 - CLI/quiet output: emit final token usage and cost metadata to stderr when adapters include it in the ACP prompt result, while keeping quiet stdout as assistant text only. (#257)

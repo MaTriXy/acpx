@@ -37,6 +37,11 @@ type FakeClient = {
   }>;
   setSessionMode: (sessionId: string, modeId: string) => Promise<void>;
   setSessionModel: (sessionId: string, modelId: string) => Promise<void>;
+  setSessionConfigOption?: (
+    sessionId: string,
+    configId: string,
+    value: string,
+  ) => Promise<SetSessionConfigOptionResponse>;
 };
 
 const ACTIVE_CONTROLLER: ConnectedSessionController & {
@@ -692,6 +697,140 @@ test("connectAndLoadSession restores the original session when desired model rep
     assert.equal(record.acpSessionId, "stale-session");
     assert.equal(record.agentSessionId, "stale-runtime");
     assert.equal(record.acpx?.current_model_id, undefined);
+  });
+});
+
+test("connectAndLoadSession replays desired config options on a fresh session", async () => {
+  await withTempHome(async (homeDir) => {
+    const cwd = path.join(homeDir, "workspace");
+    await fs.mkdir(cwd, { recursive: true });
+
+    const record = makeSessionRecord({
+      acpxRecordId: "config-replay-record",
+      acpSessionId: "stale-session",
+      agentCommand: "agent",
+      cwd,
+      acpx: {
+        desired_config_options: {
+          reasoning_effort: "high",
+        },
+      },
+    });
+
+    const configCalls: Array<{ sessionId: string; configId: string; value: string }> = [];
+    const client: FakeClient = {
+      hasReusableSession: () => false,
+      start: async () => {},
+      getAgentLifecycleSnapshot: () => ({
+        running: true,
+      }),
+      supportsLoadSession: () => true,
+      loadSessionWithOptions: async () => {
+        throw {
+          error: {
+            code: -32002,
+            message: "session not found",
+          },
+        };
+      },
+      createSession: async () => ({
+        sessionId: "fresh-session",
+        agentSessionId: "fresh-runtime",
+      }),
+      setSessionMode: async () => {},
+      setSessionModel: async () => {},
+      setSessionConfigOption: async (sessionId, configId, value) => {
+        configCalls.push({ sessionId, configId, value });
+        return { configOptions: [] };
+      },
+    };
+
+    const result = await connectAndLoadSession({
+      client: client as never,
+      record,
+      activeController: ACTIVE_CONTROLLER,
+    });
+
+    assert.equal(result.sessionId, "fresh-session");
+    assert.equal(result.resumed, false);
+    assert.deepEqual(configCalls, [
+      {
+        sessionId: "fresh-session",
+        configId: "reasoning_effort",
+        value: "high",
+      },
+    ]);
+  });
+});
+
+test("connectAndLoadSession restores the original session when desired config replay fails", async () => {
+  await withTempHome(async (homeDir) => {
+    const cwd = path.join(homeDir, "workspace");
+    await fs.mkdir(cwd, { recursive: true });
+
+    const record = makeSessionRecord({
+      acpxRecordId: "config-replay-failure-record",
+      acpSessionId: "stale-session",
+      agentSessionId: "stale-runtime",
+      agentCommand: "agent",
+      cwd,
+      acpx: {
+        desired_config_options: {
+          reasoning_effort: "xhigh",
+        },
+      },
+    });
+
+    const client: FakeClient = {
+      hasReusableSession: () => false,
+      start: async () => {},
+      getAgentLifecycleSnapshot: () => ({
+        running: true,
+      }),
+      supportsLoadSession: () => true,
+      loadSessionWithOptions: async () => {
+        throw {
+          error: {
+            code: -32002,
+            message: "session not found",
+          },
+        };
+      },
+      createSession: async () => ({
+        sessionId: "fresh-session",
+        agentSessionId: "fresh-runtime",
+      }),
+      setSessionMode: async () => {},
+      setSessionModel: async () => {},
+      setSessionConfigOption: async (sessionId, configId, value) => {
+        assert.equal(sessionId, "fresh-session");
+        assert.equal(configId, "reasoning_effort");
+        assert.equal(value, "xhigh");
+        throw new Error("config restore rejected");
+      },
+    };
+
+    await assert.rejects(
+      async () =>
+        await connectAndLoadSession({
+          client: client as never,
+          record,
+          activeController: ACTIVE_CONTROLLER,
+        }),
+      (error: unknown) => {
+        assert(error instanceof Error);
+        assert.equal(error.name, "SessionConfigOptionReplayError");
+        assert.equal((error as Error & { retryable?: boolean }).retryable, true);
+        assert.match(
+          error.message,
+          /Failed to replay saved session config option reasoning_effort/,
+        );
+        return true;
+      },
+    );
+
+    assert.equal(record.acpSessionId, "stale-session");
+    assert.equal(record.agentSessionId, "stale-runtime");
   });
 });
 

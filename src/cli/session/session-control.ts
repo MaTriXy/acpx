@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   setCurrentModelId,
+  setDesiredConfigOption,
   setDesiredModeId,
   setDesiredModelId,
 } from "../../session/mode-preference.js";
@@ -123,8 +124,10 @@ export async function setSessionConfigOption(
     const record = await resolveSessionRecord(options.sessionId);
     if (options.configId === "mode") {
       setDesiredModeId(record, options.value);
-      await writeSessionRecord(record);
+    } else {
+      setDesiredConfigOption(record, options.configId, options.value);
     }
+    await writeSessionRecord(record);
     return {
       record,
       response: ownerResponse,

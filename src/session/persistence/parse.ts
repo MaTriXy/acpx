@@ -287,6 +287,19 @@ function parseAcpxState(raw: unknown): SessionAcpxState | undefined {
     state.desired_mode_id = record.desired_mode_id;
   }
 
+  const desiredConfigOptions = asRecord(record.desired_config_options);
+  if (desiredConfigOptions) {
+    const parsed: Record<string, string> = {};
+    for (const [key, value] of Object.entries(desiredConfigOptions)) {
+      if (typeof key === "string" && typeof value === "string") {
+        parsed[key] = value;
+      }
+    }
+    if (Object.keys(parsed).length > 0) {
+      state.desired_config_options = parsed;
+    }
+  }
+
   if (typeof record.current_model_id === "string") {
     state.current_model_id = record.current_model_id;
   }

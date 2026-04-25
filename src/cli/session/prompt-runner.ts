@@ -5,6 +5,7 @@ import {
 } from "../../runtime/engine/connected-session.js";
 import {
   setCurrentModelId,
+  setDesiredConfigOption,
   setDesiredModeId,
   setDesiredModelId,
 } from "../../session/mode-preference.js";
@@ -152,6 +153,8 @@ export async function runSessionSetConfigOptionDirect(
       );
       if (options.configId === "mode") {
         setDesiredModeId(record, options.value);
+      } else {
+        setDesiredConfigOption(record, options.configId, options.value);
       }
       return response;
     },

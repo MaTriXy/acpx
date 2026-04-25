@@ -286,6 +286,7 @@ export type SessionAcpxState = {
   reset_on_next_ensure?: boolean;
   current_mode_id?: string;
   desired_mode_id?: string;
+  desired_config_options?: Record<string, string>;
   current_model_id?: string;
   available_models?: string[];
   available_commands?: string[];

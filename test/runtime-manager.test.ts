@@ -1915,6 +1915,9 @@ test("AcpRuntimeManager reuses a kept-open persistent client for controls before
       options: [{ value: "manual", name: "Manual" }],
     },
   ]);
+  assert.deepEqual(store.records.get(record.acpxRecordId)?.acpx?.desired_config_options, {
+    approval: "manual",
+  });
   assert.equal(closeCalls, 0);
 
   await manager.close(handle);

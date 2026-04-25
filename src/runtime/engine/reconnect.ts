@@ -7,12 +7,14 @@ import {
 } from "../../acp/error-normalization.js";
 import { InterruptedError, TimeoutError, withTimeout } from "../../async-control.js";
 import {
+  SessionConfigOptionReplayError,
   SessionModeReplayError,
   SessionModelReplayError,
   SessionResumeRequiredError,
 } from "../../errors.js";
 import { incrementPerfCounter } from "../../perf-metrics.js";
 import {
+  getDesiredConfigOptions,
   getDesiredModeId,
   getDesiredModelId,
   setCurrentModelId,
@@ -184,6 +186,37 @@ async function replayDesiredModel(params: {
   }
 }
 
+async function replayDesiredConfigOptions(params: {
+  client: AcpClient;
+  sessionId: string;
+  desiredConfigOptions: Record<string, string>;
+  previousSessionId: string;
+  timeoutMs?: number;
+  verbose?: boolean;
+}): Promise<void> {
+  for (const [configId, value] of Object.entries(params.desiredConfigOptions)) {
+    try {
+      await withTimeout(
+        params.client.setSessionConfigOption(params.sessionId, configId, value),
+        params.timeoutMs,
+      );
+      if (params.verbose) {
+        process.stderr.write(
+          `[acpx] replayed desired config option ${configId} on fresh ACP session ${params.sessionId} (previous ${params.previousSessionId})\n`,
+        );
+      }
+    } catch (error) {
+      throw new SessionConfigOptionReplayError(
+        `Failed to replay saved session config option ${configId} on fresh ACP session ${params.sessionId}: ${formatErrorMessage(error)}`,
+        {
+          cause: error instanceof Error ? error : undefined,
+          retryable: true,
+        },
+      );
+    }
+  }
+}
+
 function restoreOriginalSessionState(params: {
   record: SessionRecord;
   sessionId: string;
@@ -203,6 +236,7 @@ export async function connectAndLoadSession(
   const originalAgentSessionId = record.agentSessionId;
   const desiredModeId = getDesiredModeId(record.acpx);
   const desiredModelId = getDesiredModelId(record.acpx);
+  const desiredConfigOptions = getDesiredConfigOptions(record.acpx);
   const storedProcessAlive = isProcessAlive(record.pid);
   const shouldReconnect = Boolean(record.pid) && !storedProcessAlive;
 
@@ -298,6 +332,14 @@ export async function connectAndLoadSession(
         desiredModelId,
         previousSessionId: originalSessionId,
         models: sessionModels,
+        timeoutMs: options.timeoutMs,
+        verbose: options.verbose,
+      });
+      await replayDesiredConfigOptions({
+        client,
+        sessionId,
+        desiredConfigOptions,
+        previousSessionId: originalSessionId,
         timeoutMs: options.timeoutMs,
         verbose: options.verbose,
       });
